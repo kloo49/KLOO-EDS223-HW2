@@ -24,6 +24,8 @@ library(sf)
 library(tmap)
 library(here)
 library(stars)
+library(ggplot2)
+library(patchwork)
 ```
 
 ```{r}
@@ -36,7 +38,9 @@ ejscreen <- st_read(here('data','ejscreen','EJSCREEN_2023_BG_StatePct_with_AS_CN
   st_transform(crs = 4326)
 
 # bike and pedestrian crash reports
-crashes <- read_csv(here('data','SWITRS_LA','crashes.csv'))
+crashes <- read_csv(here('data','SWITRS_LA','crashes.csv')) |> 
+  drop_na(POINT_X, POINT_Y) |> 
+  st_as_sf(coords = c('POINT_X','POINT_Y'), crs = 4326)
 ```
 
 ```{r}
@@ -45,11 +49,7 @@ st_crs(ejscreen) # WGS84
 st_crs(holcgrade) # WGS84
 st_crs(crashes) # NA
 
-# COME BACK TO THIS!!!
-# # Transform CRS
-# crashes_wsg84 <- crashes |> 
-#   st_as_sf(coords = c('LONGITUDE','LATITUDE'), crs = st_crs(ejscreen))
-# st_crs(test)
+st_crs(ejscreen) == st_crs(holcgrade) # TRUE
 ```
 
 ## Part 1: Legacy of redlining in current environmental (in)justice
@@ -61,8 +61,9 @@ Exploring the historical redlining in Los Angeles and its legacy on present-day 
 losangeles <- ejscreen |> 
   filter(STATE_NAME == 'California', CNTY_NAME == 'Los Angeles County')
 
-tm_shape(losangeles, bbox = c(-118.65, 33.65, -117.65, 34.35)) +
-  tm_polygons(lwd = 0) +
+tm_shape(losangeles, bbox = c(-118.7, 33.65, -117.65, 34.35)) +
+  tm_polygons(fill = 'white',
+              lwd = 1) +
 tm_shape(holcgrade) +
   tm_polygons(fill = 'grade',
              fill.legend = tm_legend(title = 'HOLC Grades',
@@ -80,9 +81,10 @@ Summarize the data by percent of census block group by HOLC grade.
 holcgrade  <- st_make_valid(holcgrade)
 losangeles <- st_make_valid(losangeles)
 
-laholc <- st_join(holcgrade, losangeles, join = st_intersects) |> 
+laholc <- st_join(holcgrade, losangeles, join = st_intersects) |> # st intersects??
   st_drop_geometry() |> 
   select(ID, grade, LOWINCPCT, P_PM25, P_LIFEEXPPCT)
+glimpse(laholc)
 ```
 
 ```{r}
@@ -106,12 +108,75 @@ conditions
 ```
 
 ```{r}
-ggplot(
+# make color palette for the entire doc
+
+plot1 <- ggplot(
   data = conditions,
   mapping = aes(
     x = mean_low_pct,
-    y = mean_pm25
+    y = mean_lifeexp,
+    color = grade
   )
-) + geom_point() +
-  facet_wrap(~grade)
+) + geom_point(size = 7) +
+  xlab('Mean % Low Income') +
+  ylab('Mean Percentile for Low Life Expectancy') +
+  labs(color = 'HOLC Grade')
+
+plot2 <- ggplot(
+  data = conditions,
+  mapping = aes(
+    x = mean_pm25,
+    y = mean_lifeexp,
+    color = grade
+  )
+) + geom_point(size = 7) +
+  xlab('Mean Percentitle for PM 2.5') +
+  ylab('Mean Percentile for Low Life Expectancy') +
+  labs(color = 'HOLC Grade')
+
+plot <- plot1 + plot2
+plot + plot_annotation(
+  title = 'Mean Life Expectancy across HOLC Grades'
+)
+```
+
+Based on the plot above, there is a strong pattern between HOLC grade and low life expectancy. As percent low income and PM 2.5 concentrations increase, low life expectancy increases as well. The grade with the highest values in all 3 categories is rank D, and vice versa for rank A. This means that redlining grades tend to have low life expectancy, high percent low income, and high percentile for PM 2.5 as compared to A grade.
+
+## Part 2: Legacy of redlining in pedstrian and bike accidents
+
+Explore the legacy of historical redlining in Los Angeles and pedestrian and bike crashes/fatalities.
+
+Create a figure that summarizes the percent of observations within redlined neighbourhoods within each HOLC grade.
+
+```{r}
+# come back to this
+crash_holc <- st_join(crashes, holcgrade, join = st_intersects) |> 
+  st_drop_geometry() |> 
+  select('grade','PEDESTRIAN_ACCIDENT','BICYCLE_ACCIDENT') |> 
+  group_by(grade) |> 
+  summarize(ped_accidents = n(), bike_accidents = n()) |> 
+  mutate(perc_ped_acc = ped_accidents/sum(ped_accidents) * 100, 
+         perc_bike_acc = bike_accidents/sum(bike_accidents) * 100)
+crash_holc
+```
+
+```{r}
+ggplot(crash_holc,
+      aes())
+```
+
+```{r}
+tm_shape(losangeles, bbox = c(-118.7, 33.65, -117.65, 34.35)) +
+  tm_polygons(fill = 'white',
+              lwd = 1) +
+tm_shape(holcgrade) +
+  tm_polygons(fill = 'grade',
+             fill.legend = tm_legend(title = 'HOLC Grades',
+                                    position = tm_pos_out("right"))) + # TODO: assign colors to the grades
+tm_shape(crash_holc) +
+  tm_dots() +
+tm_title(text = 'Los Angeles HOLC Neighborhoods') +
+tm_graticules() +
+tm_scalebar() +
+tm_compass()
 ```
