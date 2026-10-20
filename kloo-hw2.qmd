@@ -12,3 +12,106 @@ format:
 options: 
   chunk_output_type: console
 ---
+
+## Background
+The Home Owners’ Loan Corporation (HOLC) ranked houses by color, which led to the term "redlining". This is the basis of the social injustices to individuals living in these areas.
+
+## Data
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(here)
+library(stars)
+```
+
+```{r}
+# HOLC redlining
+holcgrade <- st_read(here('data','mapping-inequality','mapping-inequality-los-angeles.json')) |> 
+  st_transform(crs = 4326)
+
+# Environmental screening and mapping
+ejscreen <- st_read(here('data','ejscreen','EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb')) |> 
+  st_transform(crs = 4326)
+
+# bike and pedestrian crash reports
+crashes <- read_csv(here('data','SWITRS_LA','crashes.csv'))
+```
+
+```{r}
+# Check coordinat systems
+st_crs(ejscreen) # WGS84
+st_crs(holcgrade) # WGS84
+st_crs(crashes) # NA
+
+# COME BACK TO THIS!!!
+# # Transform CRS
+# crashes_wsg84 <- crashes |> 
+#   st_as_sf(coords = c('LONGITUDE','LATITUDE'), crs = st_crs(ejscreen))
+# st_crs(test)
+```
+
+## Part 1: Legacy of redlining in current environmental (in)justice
+
+Exploring the historical redlining in Los Angeles and its legacy on present-day environmental justice.
+
+```{r}
+# Map of historical redlining neighbourhoods in LA
+losangeles <- ejscreen |> 
+  filter(STATE_NAME == 'California', CNTY_NAME == 'Los Angeles County')
+
+tm_shape(losangeles, bbox = c(-118.65, 33.65, -117.65, 34.35)) +
+  tm_polygons(lwd = 0) +
+tm_shape(holcgrade) +
+  tm_polygons(fill = 'grade',
+             fill.legend = tm_legend(title = 'HOLC Grades',
+                                    position = tm_pos_out("right"))) + # TODO: assign colors to the grades
+tm_title(text = 'Los Angeles HOLC Neighborhoods') +
+tm_graticules() +
+tm_scalebar() +
+tm_compass()
+```
+
+Summarize the data by percent of census block group by HOLC grade.
+
+```{r}
+# Join HOLC and LA spatially
+holcgrade  <- st_make_valid(holcgrade)
+losangeles <- st_make_valid(losangeles)
+
+laholc <- st_join(holcgrade, losangeles, join = st_intersects) |> 
+  st_drop_geometry() |> 
+  select(ID, grade, LOWINCPCT, P_PM25, P_LIFEEXPPCT)
+```
+
+```{r}
+# Summarize by census block group by HOLC grade
+census_block_holc <- laholc |> 
+  group_by(grade) |> 
+  summarize(count = n()) |> 
+  mutate(perc_census = count/sum(count)*100)
+census_block_holc
+```
+
+Create visualizations
+
+```{r}
+conditions <- laholc |> 
+  group_by(grade) |> 
+  summarise(mean_low_pct = mean(LOWINCPCT, na.rm = TRUE),
+            mean_pm25 = mean(P_PM25, na.rm = TRUE),
+            mean_lifeexp = mean(P_LIFEEXPPCT, na.rm = TRUE))
+conditions
+```
+
+```{r}
+ggplot(
+  data = conditions,
+  mapping = aes(
+    x = mean_low_pct,
+    y = mean_pm25
+  )
+) + geom_point() +
+  facet_wrap(~grade)
+```
