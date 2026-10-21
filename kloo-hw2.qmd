@@ -154,29 +154,27 @@ crash_holc <- st_join(crashes, holcgrade, join = st_intersects) |>
   st_drop_geometry() |> 
   select('grade','PEDESTRIAN_ACCIDENT','BICYCLE_ACCIDENT') |> 
   group_by(grade) |> 
-  summarize(ped_accidents = n(), bike_accidents = n()) |> 
+  summarize(ped_accidents = sum(PEDESTRIAN_ACCIDENT == 'Y', na.rm = TRUE), bike_accidents = sum(BICYCLE_ACCIDENT == 'Y', na.rm = TRUE)) |> 
   mutate(perc_ped_acc = ped_accidents/sum(ped_accidents) * 100, 
          perc_bike_acc = bike_accidents/sum(bike_accidents) * 100)
 crash_holc
 ```
 
 ```{r}
-ggplot(crash_holc,
-      aes())
-```
+crash_holc_longer <- crash_holc |> 
+  pivot_longer(
+    cols = c(perc_ped_acc, perc_bike_acc),
+    names_to = 'percentage',
+    values_to = 'accident'
+  )
 
-```{r}
-tm_shape(losangeles, bbox = c(-118.7, 33.65, -117.65, 34.35)) +
-  tm_polygons(fill = 'white',
-              lwd = 1) +
-tm_shape(holcgrade) +
-  tm_polygons(fill = 'grade',
-             fill.legend = tm_legend(title = 'HOLC Grades',
-                                    position = tm_pos_out("right"))) + # TODO: assign colors to the grades
-tm_shape(crash_holc) +
-  tm_dots() +
-tm_title(text = 'Los Angeles HOLC Neighborhoods') +
-tm_graticules() +
-tm_scalebar() +
-tm_compass()
+ggplot(crash_holc_longer,
+      aes(grade, accident, fill = percentage)
+  ) + geom_col(position = 'dodge') +
+    labs(
+      title = 'Percentage of Accidents Occurence by Grade',
+      fill = 'Percentage'
+    ) +
+    ylab('percent %') +
+    scale_fill_discrete(labels = c('% Bike Accident','% Pedestiran Accident'))
 ```
