@@ -14,11 +14,13 @@ options:
 ---
 
 ## Background
-The Home Owners’ Loan Corporation (HOLC) ranked houses by color, which led to the term "redlining". This is the basis of the social injustices to individuals living in these areas.
+The Home Owners’ Loan Corporation (HOLC) ranked houses by color, which led to the term "redlining". HOLC assigns grades from A to D, where A is the best and D is the worst grade. D is assigned the color red, terming "redlining". This is the basis of the social injustices to individuals living in these areas.
+
+In this assignment, we explore the conditions of present-day injustices and the proportion of pedestrian and bicycle accidents by HOLC regions.
 
 ## Data
-
 ```{r}
+#| output: False
 library(tidyverse)
 library(sf)
 library(tmap)
@@ -29,12 +31,15 @@ library(patchwork)
 ```
 
 ```{r}
+#| output: False
 # HOLC redlining
-holcgrade <- st_read(here('data','mapping-inequality','mapping-inequality-los-angeles.json')) |> 
+holcgrade <- st_read(here('data','mapping-inequality',
+'mapping-inequality-los-angeles.json')) |> 
   st_transform(crs = 4326)
 
 # Environmental screening and mapping
-ejscreen <- st_read(here('data','ejscreen','EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb')) |> 
+ejscreen <- st_read(here('data','ejscreen',
+'EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb')) |> 
   st_transform(crs = 4326)
 
 # bike and pedestrian crash reports
@@ -44,61 +49,65 @@ crashes <- read_csv(here('data','SWITRS_LA','crashes.csv')) |>
 ```
 
 ```{r}
-# Check coordinat systems
-st_crs(ejscreen) # WGS84
-st_crs(holcgrade) # WGS84
-st_crs(crashes) # NA
-
+# Check coordinate systems
 st_crs(ejscreen) == st_crs(holcgrade) # TRUE
+st_crs(ejscreen) == st_crs(crashes) # TRUE
 ```
 
 ## Part 1: Legacy of redlining in current environmental (in)justice
 
 Exploring the historical redlining in Los Angeles and its legacy on present-day environmental justice.
 
+### 1.1 Create a map of historical redlining neighbourhoods
+
 ```{r}
 # Map of historical redlining neighbourhoods in LA
 losangeles <- ejscreen |> 
   filter(STATE_NAME == 'California', CNTY_NAME == 'Los Angeles County')
 
-tm_shape(losangeles, bbox = c(-118.7, 33.65, -117.65, 34.35)) +
+holc_colors <- c('#28d774','#4ca1dd','#d8d825','#ff3535')
+
+tm_shape(losangeles, bbox = holcgrade) +
   tm_polygons(fill = 'white',
               lwd = 1) +
 tm_shape(holcgrade) +
   tm_polygons(fill = 'grade',
-             fill.legend = tm_legend(title = 'HOLC Grades',
-                                    position = tm_pos_out("right"))) + # TODO: assign colors to the grades
+              fill.scale = tm_scale_categorical(values = holc_colors),
+              fill.legend = tm_legend(title = 'HOLC Grades',
+                                    position = tm_pos_out("right"))) + 
 tm_title(text = 'Los Angeles HOLC Neighborhoods') +
 tm_graticules() +
-tm_scalebar() +
 tm_compass()
 ```
+This map shows the available information we have regarding HOLC grades. Now we know which areas we are evaluating. Visually, it seems like HOLC Grade C has the highest spatial coverage.
 
-Summarize the data by percent of census block group by HOLC grade.
+### 1.2.1 Summarize the data by percent of census block group by HOLC grade.
 
+First, find the sptial overlap between the HOLC grade and Los Angeles.
 ```{r}
 # Join HOLC and LA spatially
 holcgrade  <- st_make_valid(holcgrade)
 losangeles <- st_make_valid(losangeles)
 
-laholc <- st_join(holcgrade, losangeles, join = st_intersects) |> # st intersects??
+laholc <- st_join(losangeles, holcgrade, join = st_intersects) |>
   st_drop_geometry() |> 
   select(ID, grade, LOWINCPCT, P_PM25, P_LIFEEXPPCT)
-glimpse(laholc)
 ```
 
 ```{r}
-# Summarize by census block group by HOLC grade
+# tibble that shows the percent of census block groups in each HOLC grade
 census_block_holc <- laholc |> 
   group_by(grade) |> 
   summarize(count = n()) |> 
   mutate(perc_census = count/sum(count)*100)
 census_block_holc
 ```
+Based on the data, HOLC Grade C has the highest percent census block group per grade.
 
-Create visualizations
+### 1.3 Create visualizations summarizing current conditions within HOLC grades
 
 ```{r}
+# finding the mean value per HOLC grade
 conditions <- laholc |> 
   group_by(grade) |> 
   summarise(mean_low_pct = mean(LOWINCPCT, na.rm = TRUE),
@@ -108,39 +117,42 @@ conditions
 ```
 
 ```{r}
-# make color palette for the entire doc
-
-plot1 <- ggplot(
-  data = conditions,
-  mapping = aes(
-    x = mean_low_pct,
-    y = mean_lifeexp,
-    color = grade
-  )
+plot1 <- ggplot(data = conditions,
+                mapping = aes(x = mean_low_pct, 
+                              y = mean_lifeexp, 
+                              color = grade)
 ) + geom_point(size = 7) +
-  xlab('Mean % Low Income') +
-  ylab('Mean Percentile for Low Life Expectancy') +
-  labs(color = 'HOLC Grade')
+  scale_color_manual(values = c('A'=holc_colors[1],
+                                'B'=holc_colors[2],
+                                'C'=holc_colors[3],
+                                'D'=holc_colors[4])) +
+  labs(x = 'Mean % Low Income',
+       y = 'Mean Percentile for Low Life Expectancy',
+       color = 'HOLC Grade') +
+  theme(legend.position = 'none')
 
-plot2 <- ggplot(
-  data = conditions,
-  mapping = aes(
-    x = mean_pm25,
-    y = mean_lifeexp,
-    color = grade
-  )
+plot2 <- ggplot(data = conditions,
+                mapping = aes(x = mean_pm25, 
+                              y = mean_lifeexp, 
+                              color = grade)
 ) + geom_point(size = 7) +
-  xlab('Mean Percentitle for PM 2.5') +
-  ylab('Mean Percentile for Low Life Expectancy') +
-  labs(color = 'HOLC Grade')
+  scale_color_manual(values = c('A'=holc_colors[1],
+                                'B'=holc_colors[2],
+                                'C'=holc_colors[3],
+                                'D'=holc_colors[4])) +
+  labs(x = 'Mean Percentitle for PM 2.5',
+       y = 'Mean Percentile for Low Life Expectancy',
+       color = 'HOLC Grade')
 
 plot <- plot1 + plot2
-plot + plot_annotation(
-  title = 'Mean Life Expectancy across HOLC Grades'
-)
+plot + plot_annotation(title = 'Mean Life Expectancy across HOLC Grades')
 ```
 
-Based on the plot above, there is a strong pattern between HOLC grade and low life expectancy. As percent low income and PM 2.5 concentrations increase, low life expectancy increases as well. The grade with the highest values in all 3 categories is rank D, and vice versa for rank A. This means that redlining grades tend to have low life expectancy, high percent low income, and high percentile for PM 2.5 as compared to A grade.
+### 1.4 Reflection
+
+Based on the plot above, there is a strong pattern between HOLC grade and low life expectancy. As percent low income and PM 2.5 concentrations increase, low life expectancy increases as well. The grade with the highest values in all 3 categories is rank D, and vice versa for rank A.  
+This means that redlining grades tend to have low life expectancy, high percent low income, and high percentile for PM 2.5 as compared to A grade.
+
 
 ## Part 2: Legacy of redlining in pedstrian and bike accidents
 
@@ -149,21 +161,22 @@ Explore the legacy of historical redlining in Los Angeles and pedestrian and bik
 Create a figure that summarizes the percent of observations within redlined neighbourhoods within each HOLC grade.
 
 ```{r}
-# come back to this
+# Finding the percent of observations for peds and bikes
 crash_holc <- st_join(crashes, holcgrade, join = st_intersects) |> 
   st_drop_geometry() |> 
   select('grade','PEDESTRIAN_ACCIDENT','BICYCLE_ACCIDENT') |> 
   group_by(grade) |> 
-  summarize(ped_accidents = sum(PEDESTRIAN_ACCIDENT == 'Y', na.rm = TRUE), bike_accidents = sum(BICYCLE_ACCIDENT == 'Y', na.rm = TRUE)) |> 
+  summarize(ped_accidents = sum(PEDESTRIAN_ACCIDENT == 'Y', na.rm = TRUE), 
+            bike_accidents = sum(BICYCLE_ACCIDENT == 'Y', na.rm = TRUE)) |> 
   mutate(perc_ped_acc = ped_accidents/sum(ped_accidents) * 100, 
          perc_bike_acc = bike_accidents/sum(bike_accidents) * 100)
 crash_holc
 ```
 
 ```{r}
+# Pivot longer to make plotting easier
 crash_holc_longer <- crash_holc |> 
-  pivot_longer(
-    cols = c(perc_ped_acc, perc_bike_acc),
+  pivot_longer(cols = c(perc_ped_acc, perc_bike_acc),
     names_to = 'percentage',
     values_to = 'accident'
   )
@@ -178,3 +191,4 @@ ggplot(crash_holc_longer,
     ylab('percent %') +
     scale_fill_discrete(labels = c('% Bike Accident','% Pedestiran Accident'))
 ```
+Based on the table and histogram, the highest proportion of accidents are not in an identified HOLC grade, then followed by HOLC grade C. The second highest proportion of accidents occured in HOLC Grade D. This indicates most accidents occur in the lowest two HOLC grades.
