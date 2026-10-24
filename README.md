@@ -1,11 +1,11 @@
 # EDS223 HW2 - Exploring patterns of environmental justice
 [Assignment link](https://eds-223-geospatial.github.io/assignments/HW2V2.html)
 
-This assignment uses data from the United States Environmental Protection Agency's previous **EJScreen**: Environmental Justice (EJ) Screening and Mapping Tool to identify environmental injustices. This dataset was published in 2023, with a 5-year summary from 2017 to 2021. 
+This assignment uses data from the United States Environmental Protection Agency's previous [**EJScreen**]{style="color:red;"}: Environmental Justice (EJ) Screening and Mapping Tool to identify environmental injustices. This dataset was published in 2023, with a 5-year summary from 2017 to 2021. 
 
-Researchers from the Digital Scholar Lab at University of Richmond digitized maps as part of the **Mapping Inequality** Project.
+Researchers from the Digital Scholar Lab at University of Richmond digitized maps as part of the [**Mapping Inequality**]{style="color:red;"} Project.
 
-UC Berkley SafeTREC developed the Transportation Information Mapping System (TIMS) which hosts the Statewide Integrated Traffice Records System (SWITRS) database, which contains **crash** data.
+UC Berkley SafeTREC developed the Transportation Information Mapping System (TIMS) which hosts the Statewide Integrated Traffice Records System (SWITRS) database, which contains [**crash**]{style="color:red;"} data.
 
 The deliverables include spatial data of Los Angeles and the injustices that we explored in this assignment.
 
@@ -25,5 +25,5 @@ KLOO-EDS223-HW1
 
 ### Contributors
 Author: Kelly Loo  
-Instructor: Annie Adams
+Instructor: Annie Adams  
 Teaching Assistant: Mary Salami
