@@ -67,16 +67,15 @@ losangeles <- ejscreen |>
 
 holc_colors <- c('#28d774','#4ca1dd','#d8d825','#ff3535')
 
+tm_basemap(server = "Esri.WorldTopoMap") + # explore other basemaps
 tm_shape(losangeles, bbox = holcgrade) +
-  tm_polygons(fill = 'white',
-              lwd = 1) +
+  tm_borders(lwd = 0.2) +
 tm_shape(holcgrade) +
   tm_polygons(fill = 'grade',
               fill.scale = tm_scale_categorical(values = holc_colors),
               fill.legend = tm_legend(title = 'HOLC Grades',
                                     position = tm_pos_out("right"))) + 
 tm_title(text = 'Los Angeles HOLC Neighborhoods') +
-tm_graticules() +
 tm_compass()
 ```
 This map shows the available information we have regarding HOLC grades. Now we know which areas we are evaluating. Visually, it seems like HOLC Grade C has the highest spatial coverage.
@@ -89,7 +88,7 @@ First, find the sptial overlap between the HOLC grade and Los Angeles.
 holcgrade  <- st_make_valid(holcgrade)
 losangeles <- st_make_valid(losangeles)
 
-laholc <- st_join(losangeles, holcgrade, join = st_intersects) |>
+laholc <- st_join(losangeles, holcgrade, join = st_intersects) |> # we want left join to find where in losangeles does not have holcgrade
   st_drop_geometry() |> 
   select(ID, grade, LOWINCPCT, P_PM25, P_LIFEEXPPCT)
 ```
@@ -162,7 +161,7 @@ Create a figure that summarizes the percent of observations within redlined neig
 
 ```{r}
 # Finding the percent of observations for peds and bikes
-crash_holc <- st_join(crashes, holcgrade, join = st_intersects) |> 
+crash_holc <- st_join(crashes, holcgrade, join = st_intersection) |> # we want combination of crashes and holcgrade, so inner join
   st_drop_geometry() |> 
   select('grade','PEDESTRIAN_ACCIDENT','BICYCLE_ACCIDENT') |> 
   group_by(grade) |> 
@@ -192,3 +191,7 @@ ggplot(crash_holc_longer,
     scale_fill_discrete(labels = c('% Bike Accident','% Pedestiran Accident'))
 ```
 Based on the table and histogram, the highest proportion of accidents are not in an identified HOLC grade, then followed by HOLC grade C. The second highest proportion of accidents occured in HOLC Grade D. This indicates most accidents occur in the lowest two HOLC grades.
+
+## Comments for resubmission
+1. I was missing a basemap in my map of neighbourhoods in LA that we have HOLC data for. I added `tm_basemap(server = "Esri.WorldTopoMap")`, which is using a topographical map from ESRI as my basemap.
+2. I used the incorrect spatial operation to join my bike crash and areas with HOLC grades. When I previously done `join = st_intersects` and had the default value of `left = TRUE`, meaning that I left joined the data. In this case, we want to see when both crashes and holcgrade have matching information. Therefore, I corrected to `left = FALSE` for an inner join.
