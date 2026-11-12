@@ -19,7 +19,7 @@ The Home Owners’ Loan Corporation (HOLC) ranked houses by color, which led to 
 In this assignment, we explore the conditions of present-day injustices and the proportion of pedestrian and bicycle accidents by HOLC regions.
 
 ## Data
-```{r}
+```{r load-libraries}
 #| output: False
 library(tidyverse)
 library(sf)
@@ -30,7 +30,7 @@ library(ggplot2)
 library(patchwork)
 ```
 
-```{r}
+```{r load-data}
 #| output: False
 # HOLC redlining
 holcgrade <- st_read(here('data','mapping-inequality',
@@ -48,7 +48,7 @@ crashes <- read_csv(here('data','SWITRS_LA','crashes.csv')) |>
   st_as_sf(coords = c('POINT_X','POINT_Y'), crs = 4326)
 ```
 
-```{r}
+```{r check-crs}
 # Check coordinate systems
 st_crs(ejscreen) == st_crs(holcgrade) # TRUE
 st_crs(ejscreen) == st_crs(crashes) # TRUE
@@ -60,7 +60,7 @@ Exploring the historical redlining in Los Angeles and its legacy on present-day 
 
 ### 1.1 Create a map of historical redlining neighbourhoods
 
-```{r}
+```{r mapping-holc}
 # Map of historical redlining neighbourhoods in LA
 losangeles <- ejscreen |> 
   filter(STATE_NAME == 'California', CNTY_NAME == 'Los Angeles County')
@@ -115,7 +115,7 @@ conditions <- laholc |>
 conditions
 ```
 
-```{r}
+```{r EJ-map}
 plot1 <- ggplot(data = conditions,
                 mapping = aes(x = mean_low_pct, 
                               y = mean_lifeexp, 
@@ -159,9 +159,9 @@ Explore the legacy of historical redlining in Los Angeles and pedestrian and bik
 
 Create a figure that summarizes the percent of observations within redlined neighbourhoods within each HOLC grade.
 
-```{r}
+```{r joining-crashes}
 # Finding the percent of observations for peds and bikes
-crash_holc <- st_join(crashes, holcgrade, join = st_intersection) |> # we want combination of crashes and holcgrade, so inner join
+crash_holc <- st_join(crashes, holcgrade, left = FALSE) |> # we want combination of crashes and holcgrade, so inner join
   st_drop_geometry() |> 
   select('grade','PEDESTRIAN_ACCIDENT','BICYCLE_ACCIDENT') |> 
   group_by(grade) |> 
